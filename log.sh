@@ -108,8 +108,10 @@ if($dump) {
   $command = $command.'-d ';
 }
 
+my $cutPid = "awk '{print \$2}'";
+
 if($pid) {
-  $command = $command.'| grep -a `adb'.$serialId.' shell ps | grep '.$pid.' | awk '{print \$2}' | head -n1`';
+  $command = $command.'| grep -a `adb'.$serialId.' shell ps | grep '.$pid.' | '.$cutPid.' | head -n1`';
 }
 
 my @devices = (
@@ -121,7 +123,7 @@ my @devices = (
     [['recordSD'], 'filename=/sdcard/Download/`date +"%Y%m%d_%H%M"`.mp4; echo $filename; adb'.$serialId.' shell screenrecord $filename --bit-rate 8000000'],
     [['screenshot', 'screen', 'ss'], 'filename="`date +"%Y%m%d_%H%M%S"`.png"; adb start-server; adb'.$serialId.' exec-out screencap -p > $filename && echo "saved as $filename"'],
     [['monkey'], 'adb'.$serialId.' shell monkey -p '.$pid.' -v 30000 -s 1000 --pct-touch 20 --pct-motion 20 --pct-nav 40 --pct-majornav 60 --pct-syskeys 20 --pct-appswitch 50 --ignore-security-exceptions > /dev/zero &'],
-    [['monkeykill'], 'adb'.$serialId.' shell kill -s 9 `adb'.$serialId.' shell ps | grep monkey | awk '{print \$2}'`'],
+    [['monkeykill'], 'adb'.$serialId.' shell kill -s 9 `adb'.$serialId.' shell ps | grep monkey | '.$cutPid.'`'],
 
   # adb logcat filters
     [['excep', 'err'], $command.' | grep -ai "at \|exception\|runtime\|err\| E "'],

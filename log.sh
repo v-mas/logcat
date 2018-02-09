@@ -109,21 +109,23 @@ if($dump) {
 }
 
 if($pid) {
-  $command = $command.'| grep -a `adb'.$serialId.' shell ps | grep '.$pid.' | cut -c10-15 | head -n1`';
+  $command = $command.'| grep -a `adb'.$serialId.' shell ps | grep '.$pid.' | awk '{print \$2}' | head -n1`';
 }
 
 my @devices = (
     [['', 'all'], $command.''],
-	
+
     [['devices'], 'adb devices'],
     [['appops'], 'adb'.$serialId.' shell am start -n com.android.settings/com.android.settings.Settings -e :android:show_fragment com.android.settings.applications.AppOpsSummary --activity-clear-task --activity-exclude-from-recents'],
     [['record'], 'filename=/storage/emulated/legacy/Download/`date +"%Y%m%d_%H%M"`.mp4; echo $filename; adb'.$serialId.' shell screenrecord $filename --bit-rate 8000000'],
     [['recordSD'], 'filename=/sdcard/Download/`date +"%Y%m%d_%H%M"`.mp4; echo $filename; adb'.$serialId.' shell screenrecord $filename --bit-rate 8000000'],
-	[['screenshot', 'screen', 'ss'], 'filename="`date +"%Y%m%d_%H%M%S"`.png"; adb'.$serialId.' exec-out screencap -p > $filename && echo "saved as $filename"'],
-    [['monkeykill'], 'adb'.$serialId.' shell kill -s 9 `adb'.$serialId.' shell ps | grep monkey | cut -c10-15`'],
+    [['screenshot', 'screen', 'ss'], 'filename="`date +"%Y%m%d_%H%M%S"`.png"; adb start-server; adb'.$serialId.' exec-out screencap -p > $filename && echo "saved as $filename"'],
+    [['monkey'], 'adb'.$serialId.' shell monkey -p '.$pid.' -v 30000 -s 1000 --pct-touch 20 --pct-motion 20 --pct-nav 40 --pct-majornav 60 --pct-syskeys 20 --pct-appswitch 50 --ignore-security-exceptions > /dev/zero &'],
+    [['monkeykill'], 'adb'.$serialId.' shell kill -s 9 `adb'.$serialId.' shell ps | grep monkey | awk '{print \$2}'`'],
 
-	# adb logcat filters
+  # adb logcat filters
     [['excep', 'err'], $command.' | grep -ai "at \|exception\|runtime\|err\| E "'],
+
     [['lg'], $command.' | grep -avi "SignalStrength\|Bright\|LG\|PhoneInterfaceManager\|Keyguard\|PowerManager\|Wifi\|Theme\|Weather\|xt9\|wpa_supplicant\|QRemote\|MusicBrowser\|GpsLocationProvider\|Netd\|DownloadManager\|LFT\|ConnectivityService\|EAS\|SurfaceFlinger\|NetworkStats\|Tethering\|Usb\|Picasa\|OSP\|NFC\|AccessPoint\|LocSvc\|QMI\|MediaPlayer\|HttpPlayerDriver\|MediaPlayerService\|NexPlayerMPI\|NEXSTREAMING\|qcom_audio_policy_hal\|AwesomePlayer\|AudioSink\|ForecastDataCache\|KInfoc\|NtpTrustedTime\|GCoreUlr\|ALSA\|AudioTrack\|OMXCodec\|InputMethodManagerService\|AudioFlinger\|SoundPool\|AudioPolicyManagerBase\|SoundPool\|LocationManagerService"'],
     [['nexus5', '5'], $command.' | grep -avi "CalendarProvider2\|libprocessgroup\|WifiService\|wpa\|Connectivity\|wifi\|ThermalEngine\|InputMethodInfo\|audio_hw_primary\|LocationOracleImpl\|ContentResolver\|fb4a\|BluetoothAdapter\|HHXmlParser\|GAV4\|GCoreUlr\|Fitness\|avc: denied\|GATimingLogger\|ACDB-LOADER\|GpsLocationProvider\|dhcpcd\|GCM\|GAV3\|FiksuTracking\|MicrophoneInputStream\|AudioFlinger\|TelephonyNetworkFactory\|Nat464Xlat\|TaskPersister\|CommandListener\|msm8974_platform\|Tethering\|iu.SyncManager\|iu.UploadsManager\|Babel\|ConfigClient\|ConfigFetchService\|Finsky\|Gmail\|CalendarProvider\|AbstractGoogleClient\|SQLiteLog\|GAV\|DrmWidevineDash\|SyncWapiModule\|ActiveOrDefaultContextProvider\|QSEECOMAPI\|AnalyticsLogBase\|WVCdm\|NewsWeather\|GHttpClientFactory"'],
     [['nexus7', '7', 'tab7'], $command.' | grep -avi "OMX.google.mp3.decoder\|libgps\|BluetoothSocket\|ThrottleService\|UsageStats"'],
@@ -147,7 +149,7 @@ if($help) {
   print '    -p --pid package  name of the process to watch (TODO)        '."\n";
   print '    -h --help         print this help message                    '."\n";
   
-  print "\n available modes/devices:\n";
+  print "\n available devices/modes:\n";
   for my $row (@devices) {
     my @rawr = @$row;
     my @keys = @{@rawr[0]};
@@ -161,7 +163,7 @@ if($clean) {
   if($verbose) {
     print $comm."\n";
   }
-  exec($comm);
+  system($comm);
 }
 
 for my $row (@devices) {
@@ -172,7 +174,8 @@ for my $row (@devices) {
     if($verbose) {
       print $comm."\n";
     }
-    exec($comm);
+    system($comm);
+    print "finished\n";
     exit 0;
   }
 }

@@ -28,7 +28,9 @@ GetOptions (
 	"pid=s"       => \$pid,
     "verbose"     => \$verbose
   );
-  
+
+my $isCygwin = `uname` == 'CYGWIN*';
+
 my $ip = '';
 #array of aliases for known devices
 my @serials = (
@@ -111,7 +113,19 @@ if($dump) {
 my $cutPid = "awk '{print \$2}'";
 
 if($pid) {
-  $command = $command.'| grep -a `adb'.$serialId.' shell ps | grep '.$pid.' | '.$cutPid.' | head -n1`';
+  my $pid_command = "adb $serialId shell ps | grep $pid | $cutPid | head -n1";
+  if($verbose) {
+    print $pid_command."\n";
+  }
+  $pid = `adb $serialId shell ps | grep $pid | $cutPid | head -n1`;
+  if(!$pid) {
+    print "application is not running";
+	exit -1;
+  }
+  if($verbose) {
+    print 'found pid: '.$pid;
+  }
+  $command = $command.'| grep -a --color '.$pid;
 }
 
 my @devices = (
@@ -121,7 +135,7 @@ my @devices = (
     [['appops'], 'adb'.$serialId.' shell am start -n com.android.settings/com.android.settings.Settings -e :android:show_fragment com.android.settings.applications.AppOpsSummary --activity-clear-task --activity-exclude-from-recents'],
     [['record'], 'filename=/storage/emulated/legacy/Download/`date +"%Y%m%d_%H%M"`.mp4; echo $filename; adb'.$serialId.' shell screenrecord $filename --bit-rate 8000000'],
     [['recordSD'], 'filename=/sdcard/Download/`date +"%Y%m%d_%H%M"`.mp4; echo $filename; adb'.$serialId.' shell screenrecord $filename --bit-rate 8000000'],
-    [['screenshot', 'screen', 'ss'], 'filename="`date +"%Y%m%d_%H%M%S"`.png"; adb start-server; adb'.$serialId.' exec-out screencap -p > $filename && echo "saved as $filename"'],
+    [['screenshot', 'screen', 'ss'], 'filename="`date +"%Y%m%d_%H%M%S"`.png"; adb start-server; adb'.$serialId.' exec-out screencap -p > $filename && echo "saved as $filename"'.($isCygwin?' && explorer /select, `cygpath -w $filename`':'')],
     [['monkey'], 'adb'.$serialId.' shell monkey -p '.$pid.' -v 30000 -s 1000 --pct-touch 20 --pct-motion 20 --pct-nav 40 --pct-majornav 60 --pct-syskeys 20 --pct-appswitch 50 --ignore-security-exceptions > /dev/zero &'],
     [['monkeykill'], 'adb'.$serialId.' shell kill -s 9 `adb'.$serialId.' shell ps | grep monkey | '.$cutPid.'`'],
 
@@ -129,15 +143,19 @@ my @devices = (
     [['excep', 'err'], $command.' | grep -ai "at \|exception\|runtime\|err\| E "'],
 
     [['lg'], $command.' | grep -avi "SignalStrength\|Bright\|LG\|PhoneInterfaceManager\|Keyguard\|PowerManager\|Wifi\|Theme\|Weather\|xt9\|wpa_supplicant\|QRemote\|MusicBrowser\|GpsLocationProvider\|Netd\|DownloadManager\|LFT\|ConnectivityService\|EAS\|SurfaceFlinger\|NetworkStats\|Tethering\|Usb\|Picasa\|OSP\|NFC\|AccessPoint\|LocSvc\|QMI\|MediaPlayer\|HttpPlayerDriver\|MediaPlayerService\|NexPlayerMPI\|NEXSTREAMING\|qcom_audio_policy_hal\|AwesomePlayer\|AudioSink\|ForecastDataCache\|KInfoc\|NtpTrustedTime\|GCoreUlr\|ALSA\|AudioTrack\|OMXCodec\|InputMethodManagerService\|AudioFlinger\|SoundPool\|AudioPolicyManagerBase\|SoundPool\|LocationManagerService"'],
-    [['nexus5', '5'], $command.' | grep -avi "CalendarProvider2\|libprocessgroup\|WifiService\|wpa\|Connectivity\|wifi\|ThermalEngine\|InputMethodInfo\|audio_hw_primary\|LocationOracleImpl\|ContentResolver\|fb4a\|BluetoothAdapter\|HHXmlParser\|GAV4\|GCoreUlr\|Fitness\|avc: denied\|GATimingLogger\|ACDB-LOADER\|GpsLocationProvider\|dhcpcd\|GCM\|GAV3\|FiksuTracking\|MicrophoneInputStream\|AudioFlinger\|TelephonyNetworkFactory\|Nat464Xlat\|TaskPersister\|CommandListener\|msm8974_platform\|Tethering\|iu.SyncManager\|iu.UploadsManager\|Babel\|ConfigClient\|ConfigFetchService\|Finsky\|Gmail\|CalendarProvider\|AbstractGoogleClient\|SQLiteLog\|GAV\|DrmWidevineDash\|SyncWapiModule\|ActiveOrDefaultContextProvider\|QSEECOMAPI\|AnalyticsLogBase\|WVCdm\|NewsWeather\|GHttpClientFactory"'],
-    [['nexus7', '7', 'tab7'], $command.' | grep -avi "OMX.google.mp3.decoder\|libgps\|BluetoothSocket\|ThrottleService\|UsageStats"'],
-    [['sony ultra', 'sonyultra', 'z ultra'], $command.' | grep -avi "ProcessCpuTracker\|QcConnect\|HSM\|CameraAddon\|InternalIcing\|GoogleTag\|StatusBar\|ConfigFetch\|ConfigService\|PhotoSyncService\|HttpOperation\|GLSUser\|Gmail\|CalendarSyncAdapter\|ContactsSyncAdapter\|Babel\|GAV\|rmt_storage\|appoxee\|Adreno-EGL\|Vold\|WebViewChromium\|ConnectivityMonitor\|QCNEA\|EsTileSync\|SizeAdaptiveLayout\|libcamera\|ControllerSDK\|MobileDataStateTracker\|WiFi\|sony\|wpa_\|ACDB\|alsa\|Tethering\|AsahiSignature"'],
     [['moto', 'motorola'], $command.' | grep -avi "WiFiState\|WiFiService\|mobileData\|Diag_lib\|Ulp\|SBar\|SFPerf\|MDMCTBK\|fb4a\|GCore\|AlarmManager\|KeyGuard\|audio_a2dp\|AonLT\|ModemStatus\|msm8974\|3CDM\|qdhwcomposer\|LaunchCheckin\|JavaBinder\|Documents\|AuthorizationBluetoothService\|LocationSettingsChecker\|DocsApplication\|MultiDex\|MediaFocusControl\|GAV2\|LocationInitializer\|keystore\|PackageBroadcastService\|Installe\|PackageInfoHelper\|CrossAppStateProvider\|Finsky\|PackageManager\|Mtp\|Picasa\|FingerprintManager\|Uploads\|Usb\|Entropy\|LBS"'],
-    [['sony z', 'sony', 'sonyz', 'z'], $command.' | grep -avi "wifi_gbk2utf\|StatusBar.NetworkController\|QC-QMI\|wpa_supplicant\|KInfoc\|ProcessStatsService\|Settings\|ConnectivityServiceHSM\|docs.net.Status\|NDK_NativeApplicationBuilder\|JSVM\|QcConnectivityService\|GAV\|Vold\|NetworkChangeReceiver\|ALSA\|ACDB-LOADER\|CustomizationProcess\|SoLoader\|Icing\|MultiDex\|SocialEngine\|fb4a\|ConfigFetchService\|ConfigService\|SystemClassLoaderAdder\|sony\|GpsXtraDownloader\|ConfigFetchTask\|AudioTrack"'],
+    [['nexus5', '5'], $command.' | grep -avi "CalendarProvider2\|libprocessgroup\|WifiService\|wpa\|Connectivity\|wifi\|ThermalEngine\|InputMethodInfo\|audio_hw_primary\|LocationOracleImpl\|ContentResolver\|fb4a\|BluetoothAdapter\|HHXmlParser\|GAV4\|GCoreUlr\|Fitness\|avc: denied\|GATimingLogger\|ACDB-LOADER\|GpsLocationProvider\|dhcpcd\|GCM\|GAV3\|FiksuTracking\|MicrophoneInputStream\|AudioFlinger\|TelephonyNetworkFactory\|Nat464Xlat\|TaskPersister\|CommandListener\|msm8974_platform\|Tethering\|iu.SyncManager\|iu.UploadsManager\|Babel\|ConfigClient\|ConfigFetchService\|Finsky\|Gmail\|CalendarProvider\|AbstractGoogleClient\|SQLiteLog\|GAV\|DrmWidevineDash\|SyncWapiModule\|ActiveOrDefaultContextProvider\|QSEECOMAPI\|AnalyticsLogBase\|WVCdm\|NewsWeather\|GHttpClientFactory"'],
+    [['nexus5x', '5x'], $command.' | grep -avi "AdvertisingIdClient\|zygote64\|CheckinRequestBuilder\|QC-time-services\|WifiService\|Adreno\|TelephonySpam\|Conscrypt\|ModuleInitIntentOp\|AsyncOpDispatcher\|PhenotypeFlagCommitter"'],
+    [['nexus7', '7', 'tab7'], $command.' | grep -avi "OMX.google.mp3.decoder\|libgps\|BluetoothSocket\|ThrottleService\|UsageStats"'],
+    [['redmi'], $command.' | grep -avi "ThermalEngine\|ScanImpl\|WLAN_PSA\|ActivityManager\|WifiService\|cnss_diag\|WifiHAL\|wpa_supplicant\|AlarmManager\|ProximitySensorWrapper\|IzatSvc_PassiveLocListener\|MiuiPerfServiceClient\|BaseMiuiPhoneWindowManager\|qti_sensors_hal"'],
+    [['sony ultra', 'paletka', 'sonyultra', 'z ultra'], $command.' | grep -avi "ProcessCpuTracker\|QcConnect\|HSM\|CameraAddon\|InternalIcing\|GoogleTag\|StatusBar\|ConfigFetch\|ConfigService\|PhotoSyncService\|HttpOperation\|GLSUser\|Gmail\|CalendarSyncAdapter\|ContactsSyncAdapter\|Babel\|GAV\|rmt_storage\|appoxee\|Adreno-EGL\|Vold\|WebViewChromium\|ConnectivityMonitor\|QCNEA\|EsTileSync\|SizeAdaptiveLayout\|libcamera\|ControllerSDK\|MobileDataStateTracker\|WiFi\|sony\|wpa_\|ACDB\|alsa\|Tethering\|AsahiSignature"'],
+    [['sony z', 'sony', 'sonyz', 'z'], $command.' | grep -avi "wifi_gbk2utf\|StatusBar.NetworkController\|QC-QMI\|wpa_supplicant\|KInfoc\|ProcessStatsService\|Settings\|ConnectivityServiceHSM\|docs.net.Status\|NDK_NativeApplicationBuilder\|JSVM\|QcConnectivityService\|GAV\|Vold\|NetworkChangeReceiver\|ALSA\|ACDB-LOADER\|CustomizationProcess\|SoLoader\|Icing\|MultiDex\|SocialEngine\|fb4a\|ConfigFetchService\|ConfigService\|SystemClassLoaderAdder\|sony\|GpsXtraDownloader\|ConfigFetchTask\|AudioTrack\|UserLocationProducer\|FA-SVC\|WifiHAL\|Finsky\|ProcessCpuTracker"'],
     [['sonyj', 'sony j', 'j'], $command.' | grep -avi "SignalStrength\|BatteryService\|ConnectivityService\|StatusBar.NetworkController\|AudioHardwareMSM76XXA\|SecureClock\|Icing\|WifiStateMachine\|ConfigFetchService\|PeopleDatabaseHelper\|MobileDataStateTracker\|com.sonyericsson.updatecenter\|Finsky\|ConfigFetchTask\|PowerManagerService\|ThrottleService\|Adreno200-EGL\|AudioTrack\|RPC\|LocSvc_\|WifiStateMachine\|wpa_supplicant\|StateMachine\|Tethering"'],
     [['samsung', 'sgs3', 's3'], $command.' | grep -avi "MediaPlayer-JNI\|MediaPlayer\|STATUSBAR-\|AwesomePlayer\|StagefrightPlayer\|ProgressBar\|AlarmManager\|Watchdog\|SensorService\|SSRMv2\|BatteryService\|KeyguardClockWidgetService\|AbsListView\|InputDispatcher\|InputReader\|AudioPolicyManagerBase\|LvOutput\|PowerManagerService\|Samsung TTS:\|ContexualWidgetMonitor\|NetworkStats\|LockPatternUtils\|iNemoSensor\|AkmSensor"'],
     [['k1', 'shield', 'nV', 'nVidia'], $command.' | grep -avi "BaseInterceptor\|WifiUtil\|WifiService\|ContentHelper\|NvOsDebugPrintf"'],
     [['asus'], $command.' | grep -avi "upi_ug31xx\|<UG31/E>\|wpa_supplicant\|PowerUI\|KeyguardUpdateMonitor\|DownloadManagerWrapper\|PowerSaverUpdateIcon\|CarrierText\|Telecom\|SignalClusterView\|StatusBar.NetworkController\|WifiWatchdog\|WifiStateMachine\|lights\|audio-parameter-manager\|FA-SVC\|KeyguardSecurityView\|ImageWallpaper\|Asus"']
+    [['sgsa', 'alpha'], $command.' | grep -avi "StatusBar.NetworkController\|wpa_supplicant\|BatteryService\|ActivityManager\|AudioPolicyManager\|BatteryMeterView\|MotionRecognitionService\|KeyguardUpdateMonitor\|STATUSBAR-WifiQuickSettingButton\|FaceInterface\|AwesomePlayer\|OMXCodec\|AudioCache\|OggExtractor\|StagefrightPlayer\|smd Interface\|KeyguardMessageArea\|KeyguardEffectViewController"'],
+	[['sgs8'], $command.' | grep -avi "dex2oat\|LiveIconLoader\|ConnectivityService\|WifiConnectivityMonitor\|APM_AudioPolicyManager\|SamsungAlarmManager\|DisplayPowerController\|SEC LightsHAL:\|KeyguardViewMediator\|bauth_FPBAuth\|TeeSysClient\|ContactsProvider_EventLog\|NetworkController.MobileSignalController\|TLC_TIMA_PKM\|mc_tlc_communication\|GLAnimatorManager\|GyroRender\|SurfaceFlinger\|LiveClock\|GalaxyWallpaper\|WallpaperManager\|PowerManagerService\|AODWindowManager\|oneconnect\|PluginPlatform\|BixbyApi_0\|SamsungAnalytics\|ResourceType\|Knox\|SSRM:\|SsacManager\|GOS:\|MotionRecognitionService\|AudioService\|audio_hw_primary_abox\|SdpLogService\|ResourceManagerService\|ACodec\|OMX\|InputMethodManagerService\|libexynosv4l2\|tlc_communication\|TrayVisibilityController\|CocktailBarUiController\|AccessibilityManagerService\|LightsService\|UcmService\|audio_hw\|audio_route\|SDPLog.d\|LauncherApp\|InputReader\|VRLauncherManager\|DragLayer\|soundtrigger_hw\|WeatherWidget\|android.hardware.\|SamsungPhone\|BeaconBle\|PackageManager\|skia"'],
   );
 my $arg = join(' ', @ARGV);
 

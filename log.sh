@@ -35,12 +35,19 @@ my $ip = '';
 #array of aliases for known devices
 my @serials = (
 # [['alias1', 'alias2'], 'device id as in logcat devices'],
+	[['e', 'e1'], 'emulator-5554'],
+	[['e2'], 'emulator-5556']
   );
 
 if($serialId ne "") {
-  my @matches = $serialId =~ '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$';
+  my @matches = $serialId =~ '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(:(\d+))?$';
   if(scalar @matches gt 0) {
     $ip = $network_address.$matches[0];
+	if(scalar @matches gt 1) {
+		$ip = $ip.$matches[1];
+	} else {
+		$ip = $ip.':5555';
+	}
     print 'trying to use IP address: '.$ip."\n";
   } else {
     for my $row (@serials) {
@@ -113,14 +120,34 @@ if($dump) {
 my $cutPid = "awk '{print \$2}'";
 
 if($pid) {
-  my $pid_command = "adb $serialId shell ps | grep $pid | $cutPid | head -n1";
   if($verbose) {
-    print $pid_command."\n";
+    print "adb $serialId shell ps | grep $pid\n";
   }
-  $pid = `adb $serialId shell ps | grep $pid | $cutPid | head -n1`;
+  my @pids = `adb $serialId shell ps | grep $pid`;
+  if (scalar @pids gt 1) {
+    my @names = `echo -n '@pids' | awk '{print \$9}'`;
+    if ($verbose) {
+      print "multiple apps matches given name\n";
+      print @names;
+    }
+    my $selected = 0;
+    my $length = length(@names[0]);
+    for my $i (keys @names) {
+      if(length(@names[$i]) < $length) {
+        $selected = $i;
+        $length = length(@names[$i]);
+      }
+    }
+    $pid = `echo '@pids[$selected]' | $cutPid`;
+    if($verbose) {
+      print 'selecting package: '.@names[$selected];
+    }
+  } else {
+    $pid = `echo '@pids[0]' | $cutPid`;
+  }
   if(!$pid) {
     print "application is not running";
-	exit -1;
+    exit -1;
   }
   if($verbose) {
     print 'found pid: '.$pid;
